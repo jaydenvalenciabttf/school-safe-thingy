@@ -6,8 +6,7 @@ export const config = {
 
 export async function middleware(req) {
   const url = new URL(req.url);
-  // REPLACE 'testdomainname.xyz' with the actual site you want to mirror
-  const targetHost = 'testdomainname.xyz'; 
+  const targetHost = 'testdomainname.xyz'; // The actual blocked site
   const targetUrl = `https://${targetHost}${url.pathname}${url.search}`;
 
   const response = await fetch(targetUrl, {
@@ -21,8 +20,10 @@ export async function middleware(req) {
 
   let html = await response.text();
 
-  // This changes the text to hide from school filters
-  html = html.replace(new RegExp(targetHost, 'gi'), url.host); 
+  // --- STEP 1: FIX ABSOLUTE LINKS ---
+  html = html.replaceAll(targetHost, url.host); 
+  
+  // --- EXISTING HIDING CODE ---
   html = html.replace(/Games/gi, 'Classroom'); 
   html = html.replace(/<title>.*<\/title>/i, `<title>Educational Resources</title>`);
 

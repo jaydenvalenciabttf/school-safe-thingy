@@ -6,28 +6,46 @@ export const config = {
 
 export async function middleware(req) {
   const url = new URL(req.url);
-  const targetHost = 'testdomainname.xyz'; // The actual blocked site
-  const targetUrl = `https://${targetHost}${url.pathname}${url.search}`;
-
-  const response = await fetch(targetUrl, {
-    headers: { 'User-Agent': req.headers.get('user-agent') || '' }
-  });
-
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('text/html')) {
-    return response;
-  }
-
-  let html = await response.text();
-
-  // --- STEP 1: FIX ABSOLUTE LINKS ---
-  html = html.replaceAll(targetHost, url.host); 
   
-  // --- EXISTING HIDING CODE ---
-  html = html.replace(/Games/gi, 'Classroom'); 
-  html = html.replace(/<title>.*<\/title>/i, `<title>Educational Resources</title>`);
+  // REPLACE 'testdomainname.xyz' with the actual site you want to mirror
+  const targetDomain = 'testdomainname.xyz'; 
+  
+  // This fixes the "invalid URL parse error" by building a clean URL
+  const targetUrl = new URL(url.pathname + url.search, `https://${targetDomain}`).toString();
 
-  return new NextResponse(html, {
-    headers: { 'Content-Type': 'text/html' },
-  });
+  try {
+    const response = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': req.headers.get('user-agent') || '',
+      }
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+
+    // If it's NOT a webpage (like an image or a game file), just pass it through
+    if (!contentType.includes('text/html')) {
+      return response;
+    }
+
+    // If it IS a webpage, we modify the text to hide from school filters
+    let html = await response.text();
+
+    // 1. Fix Absolute Links (Stops the "Error from testdomain.xyz" on iPad)
+    html = html.replaceAll(targetDomain, url.host);
+    html = html.replaceAll(`https://${targetDomain}`, `https://${url.host}`);
+
+    // 2. Hide "Red Flag" words from the iPad's filter
+    html = html.replace(/Games/gi, 'Projects');
+    html = html.replace(/Unblocked/gi, 'Educational');
+    
+    // 3. Change the Tab Title
+    html = html.replace(/<title>.*<\/title>/i, `<title>Classroom Resources - ${url.host}</title>`);
+
+    return new NextResponse(html, {
+      headers: { 'Content-Type': 'text/html' },
+    });
+
+  } catch (err) {
+    return new NextResponse(`Mirror Error: ${err.message}`, { status: 500 });
+  }
 }
